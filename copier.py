@@ -11,9 +11,12 @@ import PySimpleGUI as sg
 
 '''Class Declarations'''
 class gui(sg.Window):
-	'''GUI for copier'''
-	''''''
+	'''GUI subclass for copier'''
 	def __init__(self, Title='Copier', layout="Default"):
+
+		'''
+		Declaring the basic layout of the main window and initializing with PySimpleGUI super class
+		'''
 		if layout == "Default":
 			self.layout = [	[sg.Text('')],
 					[sg.Text('Enter the Source Adress(es):')],
@@ -34,6 +37,15 @@ class gui(sg.Window):
 		sg.Window.__init__(self, Title, self.layout)
 
 	def gui_button_process(self):
+		'''
+		The following events are processed here:
+			1. Exiting from the GUI when the Exit button or (x) is pressed.
+			2. Clearing the data present in the Input path textbox
+			3. Clearing the data present in the Output path textbox
+			4. Clearing the data present in the List of Files textbox
+			5. Invoke the Syncloop when Sync button is pressed
+			6. Invoke the Findloop when Go button is pressed
+		'''
 		event, values = self.read()
 		if event in (sg.WIN_CLOSED, 'Exit'):
 			sg.popup('Thanks for using Copier@BMK\nClosing...',auto_close=True,auto_close_duration=1)
@@ -62,7 +74,7 @@ class gui(sg.Window):
 			return 1
 
 class file_lib:
-	'''All the file operations'''
+	'''All the file operations are done inside the class'''
 
 	dict_file = None
 	filename2path = []
@@ -72,6 +84,9 @@ class file_lib:
 		self.COUNT = 0
 
 	def syncer(func):
+		'''
+		Decorator to make sure the Database file is opened and closed.
+		'''
 		db_name = "database_path.db"
 		def wrapper(*args, **kwagrs):
 			if func.__name__ == "write_2_file":
@@ -83,6 +98,10 @@ class file_lib:
 		return wrapper
 
 	def dict_context(func):
+		'''
+		Decorator to make sure the filename and filename2path variables are initialized
+		while invoking syncloop.
+		'''
 		def inner(*args, **kwagrs):
 			file_lib.filename = {}
 			file_lib.filename2path = []
@@ -92,6 +111,9 @@ class file_lib:
 
 	@syncer
 	def write_2_file(self):
+		'''
+		Writes the sorted File name to Path list to the database.
+		'''
 		for i in file_lib.filename2path:
 			pos = i.find(":::")
 			if pos != -1:
@@ -102,6 +124,10 @@ class file_lib:
 
 	@syncer
 	def read_4m_file(self,file,dest):
+		'''
+		Reads the File name to path entry by seeking in the particular offset of 
+		the database.
+		'''
 		position = file_lib.filename[file]
 		file_lib.dict_file.seek(position,0)
 		path = file_lib.dict_file.readline()[:-1]
@@ -112,6 +138,10 @@ class file_lib:
 
 
 	def all_subfolder(self,window,path):
+		'''
+		Add the File entry to Filename and Filename2path variables by recursively walking through 
+		all the directory paths.
+		'''
 		ret = 0
 		event,value = window.read(timeout=0)
 		if (event ==sg.WIN_CLOSED) or ret ==-1:
@@ -137,6 +167,10 @@ class file_lib:
 
 	@dict_context
 	def syncloop(self,dirl):
+		'''
+		Syncs all the directories mentioned in the input directory list and make a sorted list.
+		Stores the list to the database.
+		'''
 		dirlist = dirl.rstrip().split('\n')
 		ret = 0
 		if len(dirlist)>0:
@@ -165,8 +199,9 @@ class file_lib:
 	@syncer
 	def findloop(self,inputlist,dest):
 		'''
-		
-		
+		Loop through the file names mentioned in the List of Files textbox.
+		Checks the database file for the path.
+		If entry is identified, then the file is copied to the destination address.		
 		'''
 		inputlist = inputlist.rstrip().split('\n')
 		dest = dest.rstrip().split('\n')
@@ -199,6 +234,8 @@ class file_lib:
 		else:
 			print("ERROR:Invalid dest. path '"+dest[0]+"'")
 		return 1
+
+		
 '''Function Declarations'''
 def instance_already_running(func):
 	"""
@@ -232,7 +269,10 @@ def main_loop():
 	'''Main function call'''
 	'''Creating layout of the GUI'''
 	##################################################################################
-	# For testing
+	# # For testing
+	# findloop = file_lib()
+	# findloop.findloop("","")
+	# del(findloop)
 	# sync_file = file_lib()
 	# sync_file.syncloop("/home/bmk/Downloads/")
 	# del(sync_file)
@@ -245,7 +285,7 @@ def main_loop():
 	# findloop = file_lib()
 	# findloop.findloop("main.exe\nmain.py","/home/bmk/Downloads/build/")
 	# del(findloop)
-	# return
+	
 	##################################################################################
 	'''Initializing the main gui class'''
 	window = gui()
