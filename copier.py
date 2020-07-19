@@ -310,39 +310,10 @@ def instance_already_running(func):
 
 
 
-class color:
-	PURPLE = '\033[95m'
-	CYAN = '\033[96m'
-	DARKCYAN = '\033[36m'
-	BLUE = '\033[94m'
-	GREEN = '\033[92m'
-	YELLOW = '\033[93m'
-	RED = '\033[91m'
-	BOLD = '\033[1m'
-	UNDERLINE = '\033[4m'
-	END = '\033[0m'
-
-
 @instance_already_running
 def main_loop():
 	'''Main function call'''
 	'''Creating layout of the GUI'''
-	##################################################################################
-	# # For testing
-	# findloop = file_lib()
-	# findloop.findloop("","")
-	# del(findloop)
-	# findloop = file_lib()
-	# findloop.findloop("main.exe\nmain.py","/home/bmk/Downloads/build/")
-	# del(findloop)
-	# sync_file = file_lib()
-	# sync_file.syncloop("/home/bmk/Downloads/")
-	# del(sync_file)
-	# findloop = file_lib()
-	# findloop.findloop("main.exe\nmain.py","/home/bmk/Downloads/build/")
-	# del(findloop)
-	# exit()
-	##################################################################################
 	'''Initializing the main gui class'''
 	window = gui()
 	status = 1
