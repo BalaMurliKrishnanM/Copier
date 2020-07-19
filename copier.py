@@ -5,6 +5,7 @@ import sys
 import shutil
 import gc
 import portalocker
+import json
 import PySimpleGUI as sg
 '''Global variables. Try to avoid'''
 
@@ -25,10 +26,10 @@ class gui(sg.Window):
 					[sg.Multiline(default_text='Paste all the directory path in each line.',key='-IN-',
 						size=(75, 5)),sg.Button('Sync')],
 					[sg.Text('Dest. Address'),sg.Input(key='-dest-',size=(70, 2))],
-					[sg.Button('Go'), sg.Button('Clear Path'),sg.Button('Clear Input'),
+					[sg.Button('Go'), sg.Button('Clear Source Path'),sg.Button('Clear Input'),
 						sg.Button('Clear Output'), sg.Button('Exit')],
 			  		[sg.Text('List of Files:                                                                                          OUTPUT:')],
-					[sg.Multiline(key='-INput-',default_text='Paste the list of files\nEach file in each line.\nEg:\nBPC_INIT_01.ice\nBPC_INIT_05.ice\nSSM_INIT_01.c\n',
+					[sg.Multiline(key='-INput-',default_text='Paste the list of files\nEach file in each line.\nEg:\nCitrix.exe\ndata.txt\nlog\n',
 						size=(50, 20)),sg.Output(size=(50,20), key='-OUTPUT-')]
 				]
 		else:
@@ -51,7 +52,7 @@ class gui(sg.Window):
 			sg.popup('Thanks for using Copier@BMK\nClosing...',auto_close=True,auto_close_duration=1)
 			self.layout = None
 			return 0
-		if event == 'Clear Path':
+		if event == 'Clear Source Path':
 			self['-IN-'].update('')
 			return 1
 		if event == 'Clear Input':
@@ -63,19 +64,20 @@ class gui(sg.Window):
 		if event == 'Go':
 			findloop = file_lib()
 			if findloop.findloop(values['-INput-'],values['-dest-']):
-				print("ERROR: Copying Stopped my user")
+				print(chr(9785), chr(8227),"ERROR: Copying Stopped my user")
 			del(findloop)
 			return 1
 		if event == 'Sync':
 			sync_file = file_lib()
 			if sync_file.syncloop(values['-IN-']):
-				print("ERROR: Suncing stopped by user")
+				print(chr(9785), chr(8227),"ERROR: Suncing stopped by user")
 			del(sync_file)
 			return 1
 
 class file_lib:
 	'''All the file operations are done inside the class'''
 
+	db_file = None
 	dict_file = None
 	filename2path = []
 	filename = {}
@@ -83,18 +85,26 @@ class file_lib:
 	def __init__(self):
 		self.COUNT = 0
 
+
+
 	def syncer(func):
 		'''
 		Decorator to make sure the Database file is opened and closed.
 		'''
 		db_name = "database_path.db"
+		db_dict = "database_dict.db"
 		def wrapper(*args, **kwagrs):
 			if func.__name__ == "write_2_file":
-				with open(db_name,"wb") as file_lib.dict_file:
-					func(*args, **kwagrs)
+				with open(db_name,"wb") as file_lib.db_file:
+					with open(db_dict, "w") as file_lib.dict_file:
+						func(*args, **kwagrs)
 				return
-			with open(db_name,"r") as file_lib.dict_file:
-				func(*args, **kwagrs)
+			try:
+				with open(db_name,"r") as file_lib.db_file:
+						with open(db_dict, "r") as file_lib.dict_file:
+							func(*args, **kwagrs)
+			except:
+				print(chr(9785), chr(8227),"ERROR: No files are synced.")
 		return wrapper
 
 	def dict_context(func):
@@ -107,6 +117,8 @@ class file_lib:
 			file_lib.filename2path = []
 			func(*args, **kwagrs)
 			del(file_lib.filename2path)
+			del(file_lib.filename)
+			file_lib.filename = {}
 		return inner
 
 	@syncer
@@ -117,20 +129,21 @@ class file_lib:
 		for i in file_lib.filename2path:
 			pos = i.find(":::")
 			if pos != -1:
-				file_lib.filename[i[:pos]] = (file_lib.dict_file.tell())
-				file_lib.dict_file.write((i+"\n").encode(encoding='UTF-8'))
+				file_lib.filename[i[:pos]] = (file_lib.db_file.tell())
+				file_lib.db_file.write((i+"\n").encode(encoding='UTF-8'))
 				continue
-			print("ERROR:Writing to db "+i)
+			print(chr(9785), chr(8227),"ERROR:Writing to db "+i)
+		json.dump(file_lib.filename, file_lib.dict_file)
 
-	@syncer
+
 	def read_4m_file(self,file,dest):
 		'''
 		Reads the File name to path entry by seeking in the particular offset of 
 		the database.
 		'''
 		position = file_lib.filename[file]
-		file_lib.dict_file.seek(position,0)
-		path = file_lib.dict_file.readline()[:-1]
+		file_lib.db_file.seek(position,0)
+		path = file_lib.db_file.readline()[:-1]
 		position = path.find(":::")
 		path = str(path[position+3:])
 		shutil.copy2(path, dest)
@@ -146,23 +159,28 @@ class file_lib:
 		event,value = window.read(timeout=0)
 		if (event ==sg.WIN_CLOSED) or ret ==-1:
 			return -1
-		for f in os.scandir(path):
+		try:
+			path = os.scandir(path)
+		except:
+			print(chr(9785), chr(8227),"ERROR: '"+path+"' is not Supported.")
+			return ret
+		for f in path:
 			if f.is_file():
-				event = window.read(timeout=0)
+				event,value = window.read(timeout=0)
 				if (event ==sg.WIN_CLOSED) or ret ==-1:
-					return 0
+					return -1
 				if f.name not in file_lib.filename:
 					file_lib.filename[f.name] = None
 					file_lib.filename2path.append(f.name+":::"+f.path)
 				else:
-					print("ERROR:Multiple instance found for '"+f.name+"'" )
+					print(chr(9785), chr(8227),"ERROR:Multiple instance found for '"+f.name+"'" )
 				self.COUNT+=1
 				window['progbar'].update_bar(self.COUNT)
 			elif(ret!=-1):
 				if f.is_dir():
 					ret = self.all_subfolder(window,f.path)
 				else:
-					print("ERROR:Not a Directory '"+f.name+"'")
+					print(chr(9785), chr(8227),"ERROR:Not a Directory '"+f.name+"'")
 		return ret
 
 	@dict_context
@@ -176,10 +194,26 @@ class file_lib:
 		if len(dirlist)>0:
 			for mypath in dirlist:
 				if os.path.isdir(mypath):
+					Layout1 = [[sg.ProgressBar(100, orientation='h', size=(50, 20), key='progbar')]]
+					window_p = gui( 'Calculating time for "'+mypath+"'",Layout1)
 					total = 0
 					self.COUNT = 0
+					i = 0
 					for root, directory, files in os.walk(mypath):
+						event,value = window_p.read(timeout=0)
+						if (event ==sg.WIN_CLOSED):
+							return
+						window_p['progbar'].update_bar(self.COUNT)
 						total += len(files)
+						if i == 0:
+							self.COUNT += 1
+						i +=1
+						i%=10
+						self.COUNT = self.COUNT%100
+					self.COUNT = 0
+					window_p.close()
+					Layout1 =None
+					window_p =None
 					Layout1 = [[sg.ProgressBar(total, orientation='h', size=(50, 20), key='progbar')]]
 					window_p = gui( 'Loading '+mypath,Layout1)
 					ret = self.all_subfolder(window_p, mypath)
@@ -188,13 +222,13 @@ class file_lib:
 					window_p =None
 					gc.collect()
 					if ret ==-1:
-						print("ERROR:Force stopped.")
+						print(chr(9785), chr(8227),"ERROR:Force stopped.")
 						continue
 					print("LOG:"+mypath+" is synced")
+					file_lib.filename2path.sort()
+					self.write_2_file()
 				else:
-					print("ERROR:Invalid path '"+mypath+"'")
-		file_lib.filename2path.sort()
-		self.write_2_file()
+					print(chr(9785), chr(8227),"ERROR:Invalid path '"+mypath+"'")
 
 	@syncer
 	def findloop(self,inputlist,dest):
@@ -210,6 +244,7 @@ class file_lib:
 			if len(inputlist)>0:
 				Layout1 = [[sg.ProgressBar(len(inputlist), orientation='h', size=(50, 20), key='progbar')]]
 				window_p = gui( 'Coping to '+dest[0],Layout1)
+				file_lib.filename = json.load(file_lib.dict_file)
 				for file in inputlist:
 					if file == "":
 						continue
@@ -225,18 +260,28 @@ class file_lib:
 						source = self.read_4m_file(file,dest[0])
 						print("LOG:"+file+" is copied")
 					else:
-						print("ERROR:Cannot find '"+file+"' in synced path.")
+						print(chr(9785), chr(8227),"ERROR:Cannot find '"+file+"' in synced path.")
 					self.COUNT+=1
 				window_p.close()
 				Layout1 =None
 				window_p =None
 				gc.collect()
 		else:
-			print("ERROR:Invalid dest. path '"+dest[0]+"'")
+			print(chr(9785), chr(8227),"ERROR:Invalid dest. path '"+dest[0]+"'")
 		return 1
 
 		
 '''Function Declarations'''
+def syncing_stat(pos):
+	pos = pos % 4
+	if(pos == 0):
+		print("\rSyncing...|",end="")
+	elif(pos == 1):
+		print("\rSyncing.../",end="")
+	elif(pos == 2):
+		print("\rSyncing...-",end="")
+	elif(pos == 3):
+		print("\rSyncing...\\",end="")
 def instance_already_running(func):
 	"""
 	Detect if an an instance with the label is already running, globally
@@ -264,6 +309,20 @@ def instance_already_running(func):
 	return main_call
 
 
+
+class color:
+	PURPLE = '\033[95m'
+	CYAN = '\033[96m'
+	DARKCYAN = '\033[36m'
+	BLUE = '\033[94m'
+	GREEN = '\033[92m'
+	YELLOW = '\033[93m'
+	RED = '\033[91m'
+	BOLD = '\033[1m'
+	UNDERLINE = '\033[4m'
+	END = '\033[0m'
+
+
 @instance_already_running
 def main_loop():
 	'''Main function call'''
@@ -273,19 +332,16 @@ def main_loop():
 	# findloop = file_lib()
 	# findloop.findloop("","")
 	# del(findloop)
+	# findloop = file_lib()
+	# findloop.findloop("main.exe\nmain.py","/home/bmk/Downloads/build/")
+	# del(findloop)
 	# sync_file = file_lib()
 	# sync_file.syncloop("/home/bmk/Downloads/")
 	# del(sync_file)
 	# findloop = file_lib()
 	# findloop.findloop("main.exe\nmain.py","/home/bmk/Downloads/build/")
 	# del(findloop)
-	# sync_file = file_lib()
-	# sync_file.syncloop("/media/bmk/alpha/Program Files (x86)/Audacity/")
-	# del(sync_file)
-	# findloop = file_lib()
-	# findloop.findloop("main.exe\nmain.py","/home/bmk/Downloads/build/")
-	# del(findloop)
-	
+	# exit()
 	##################################################################################
 	'''Initializing the main gui class'''
 	window = gui()
@@ -293,7 +349,8 @@ def main_loop():
 	while status:
 		'''GUI windows will be displayed until the exit button or (X) is clicked'''
 		status = window.gui_button_process()
-	window.close()			# Close the main gui
+
+	window.close()			# Close the main GUI 		9785 ☹ 8227 ‣
 	window =None			# Clearing the link to the GUI class to optimize the memory
 	gc.collect()			# To reduce the memory used by clearing the unreferenced objects
 
